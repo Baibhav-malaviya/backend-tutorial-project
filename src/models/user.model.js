@@ -1,4 +1,4 @@
-import express, { Schema, model } from "express";
+import mongoose, { Schema, model } from "mongoose";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
 
@@ -49,9 +49,9 @@ const userSchema = new Schema(
     { timestamps: true }, // This will automatically add the two fields (createdAt and updatedAt)
 );
 
-userSchema.pre("save", function (next) {
+userSchema.pre("save", async function (next) {
     if (!this.isModified("password")) return next();
-    this.password = bcrypt.hash(this.password, 10);
+    this.password = await bcrypt.hash(this.password, 10);
     next();
 });
 
