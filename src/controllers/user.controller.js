@@ -1,6 +1,22 @@
 import { User } from "../models/user.model.js";
 import { uploadOnCloudinary } from "../utils/cloudinary.js";
 
+const generateAccessAndRefreshToken = async (userId) => {
+    try {
+        const user = await User.findById(userId);
+        const accessToken = user.generateAccessToken();
+        const refreshToken = user.generateRefreshToken();
+
+        user.refreshToken = refreshToken;
+        await user.save({ validateBeforeSave: false }); // This is because we are saving on refresh token so all the require field is not saving then it will show error
+        return { accessToken, refreshToken };
+    } catch (error) {
+        return res
+            .status(500)
+            .json({ error: error?.message || "Something went wrong" });
+    }
+};
+
 const registerUser = async (req, res) => {
     const { userName, fullName, email, password } = req.body;
     //!check all the required fields exists or not
@@ -55,4 +71,79 @@ const registerUser = async (req, res) => {
     return res.status(201).send(createdUser);
 };
 
-export { registerUser };
+const loginUser = async (req, res) => {
+    //! find from req.body
+
+    const { userName, email, password } = req.body;
+    //! check required credentials
+
+    if (!userName && !email) {
+        return res
+            .status(403)
+            .json({ message: "Username or email is required." });
+    }
+    //! check if user exists or not
+
+    const user = await User.findOne({ $or: [{ userName }, { email }] });
+
+    if (!user) {
+        return res.status(403).json({ message: "User is not registered " });
+    }
+
+    //! check for password correction
+    const isPasswordValid = await user.isPasswordCorrect(password);
+
+    if (!isPasswordValid) {
+        return res.status(401).json({ message: "Invalid password" });
+    }
+    //! access and refresh token
+
+    const { refreshToken, accessToken } = await generateAccessAndRefreshToken(
+        user._id,
+    );
+
+    const loggedInUser = await user
+        .findById(User._id)
+        .select("-password -refreshToken");
+
+    const options = {
+        httpOnly: true,
+        secure: true,
+    };
+
+    //! return response
+
+    return res
+        .status(200)
+        .cookie("accessToken", accessToken, options)
+        .cookie("refreshToken", refreshToken, options)
+        .json({
+            message: "Logged in successfully",
+            loggedInUser,
+            accessToken,
+            refreshToken,
+        });
+};
+
+const logoutUser = async (req, res) => {
+    //delete refreshToken from database
+
+    await User.findByIdAndUpdate(
+        req.user._id,
+        { $set: { refreshToken: undefined } },
+        { new: true }, // It will return the value after updating the refreshToken
+    );
+
+    const options = {
+        httpOnly: true,
+        secure: true,
+    };
+
+    //delete cookies from frontend
+    res.status(200)
+        .clearCookie("accessToken", options)
+        .clearCookie("refreshToken", options)
+        .json({ message: "User logged out successfully" });
+};
+
+export { registerUser, loginUser, logoutUser };
