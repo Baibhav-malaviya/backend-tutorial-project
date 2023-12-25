@@ -152,7 +152,7 @@ const refreshAccessToken = async (req, res) => {
         req.cookies.refreshToken || req.body.refreshToken;
 
     if (!incomingRefreshToken) {
-        res.status(401).json({ message: "unauthorized request" });
+        return res.status(401).json({ message: "unauthorized request" });
     }
 
     try {
@@ -163,11 +163,11 @@ const refreshAccessToken = async (req, res) => {
         const user = await User.findById(decodedToken?._id);
 
         if (!user) {
-            res.status(401).json({ message: "Invalid refresh token" });
+            return res.status(401).json({ message: "Invalid refresh token" });
         }
 
         if (incomingRefreshToken !== user?.refreshToken) {
-            res.status(401).json({
+            return res.status(401).json({
                 message: "Refresh token is expired  or used",
             });
         }
@@ -193,4 +193,118 @@ const refreshAccessToken = async (req, res) => {
     }
 };
 
-export { registerUser, loginUser, logoutUser, refreshAccessToken };
+const changeCurrentPassword = async (req, res) => {
+    const { oldPassword, newPassword } = req.body;
+
+    const user = await User.findById(req.user?.id);
+    const isPasswordCorrect = await user.isPasswordCorrect(oldPassword);
+
+    if (!isPasswordCorrect) {
+        return res.status(403).json({ message: "Invalid password" });
+    }
+
+    user.password = newPassword;
+    await user.save({ validateBeforeSave: false });
+
+    return res.status(200).json({ message: "Password changed successfully" });
+};
+
+const getCurrentUser = async (req, res) => {
+    return res.status(200).json({
+        message: "Current user fetched successfully",
+        data: req.user,
+    });
+};
+
+const updateAccountDetails = async (req, res) => {
+    const { fullName, email } = req.body;
+
+    if (!fullName && !email) {
+        return res.status(404).json({ message: "Anyone of then is required" });
+    }
+
+    const user = await User.findByIdAndUpdate(
+        req.user?._id,
+        {
+            $set: {
+                fullName,
+                email,
+            },
+        },
+        { new: true },
+    ).select(" -password");
+
+    return res
+        .status(200)
+        .json({ message: "User updated successfully", data: user });
+};
+
+const updateUserAvatar = async (req, res) => {
+    const avatarLocalPath = req.file?.path;
+
+    if (!avatarLocalPath) {
+        return res.status(400).json({ message: "Avatar file not found" });
+    }
+
+    const avatar = await uploadOnCloudinary(avatarLocalPath);
+
+    if (!avatar.url) {
+        return res
+            .status(404)
+            .json({ message: "Error in uploading avatar on cloudinary" });
+    }
+
+    const user = await User.findByIdAndUpdate(
+        req.user?._id,
+        {
+            $set: { avatar: avatar.url },
+        },
+        { new: true },
+    ).select("-password");
+
+    return res
+        .status(200)
+        .json({ message: "User avatar successfully updated", data: user });
+};
+
+const updateUserCoverImage = async (req, res) => {
+    const coverImageLocalPath = req.file?.path;
+
+    if (!coverImageLocalPath) {
+        return res.status(400).json({ message: "Cover image not found" });
+    }
+
+    const coverImage = await uploadOnCloudinary(coverImage);
+
+    if (!coverImage.url) {
+        return res
+            .status(404)
+            .json({ message: "Error in uploading cover image" });
+    }
+
+    const user = await User.findByIdAndRemove(
+        req.user?._id,
+        {
+            $set: {
+                coverImage: coverImage.url,
+            },
+        },
+        { new: true },
+    ).select("-password");
+
+    return res
+        .status(200)
+        .json({ message: "Cover image successfully updated", data: user });
+};
+
+export {
+    registerUser,
+    loginUser,
+    logoutUser,
+    refreshAccessToken,
+    changeCurrentPassword,
+    getCurrentUser,
+    updateAccountDetails,
+    updateUserAvatar,
+    updateUserCoverImage,
+};
