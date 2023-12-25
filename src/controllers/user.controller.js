@@ -1,5 +1,6 @@
 import { User } from "../models/user.model.js";
 import { uploadOnCloudinary } from "../utils/cloudinary.js";
+import Jwt from "jsonwebtoken";
 
 const generateAccessAndRefreshToken = async (userId) => {
     try {
@@ -102,9 +103,9 @@ const loginUser = async (req, res) => {
         user._id,
     );
 
-    const loggedInUser = await user
-        .findById(User._id)
-        .select("-password -refreshToken");
+    const loggedInUser = await User.findById(user._id).select(
+        "-password -refreshToken",
+    );
 
     const options = {
         httpOnly: true,
@@ -146,4 +147,50 @@ const logoutUser = async (req, res) => {
         .json({ message: "User logged out successfully" });
 };
 
-export { registerUser, loginUser, logoutUser };
+const refreshAccessToken = async (req, res) => {
+    const incomingRefreshToken =
+        req.cookies.refreshToken || req.body.refreshToken;
+
+    if (!incomingRefreshToken) {
+        res.status(401).json({ message: "unauthorized request" });
+    }
+
+    try {
+        const decodedToken = Jwt.verify(
+            (incomingRefreshToken, process.env.ACCESS_REFRESH_TOKEN),
+        );
+
+        const user = await User.findById(decodedToken?._id);
+
+        if (!user) {
+            res.status(401).json({ message: "Invalid refresh token" });
+        }
+
+        if (incomingRefreshToken !== user?.refreshToken) {
+            res.status(401).json({
+                message: "Refresh token is expired  or used",
+            });
+        }
+
+        const { accessToken, refreshToken } =
+            await generateAccessAndRefreshToken(user._id);
+
+        const options = {
+            httpOnly: true,
+            secure: true,
+        };
+
+        return res
+            .status(200)
+            .cookie("accessToken", accessToken)
+            .cookie("refreshToken", refreshToken)
+            .json({
+                message: "Access and refresh token regenerated successfully",
+                data: { accessToken, refreshToken },
+            });
+    } catch (error) {
+        res.status(500).json({ message: "Something went wrong" });
+    }
+};
+
+export { registerUser, loginUser, logoutUser, refreshAccessToken };
