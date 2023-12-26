@@ -297,6 +297,76 @@ const updateUserCoverImage = async (req, res) => {
         .json({ message: "Cover image successfully updated", data: user });
 };
 
+const getUserChannelProfile = async (req, res) => {
+    const { userName } = req.params;
+
+    if (!userName?.trim()) {
+        return res.status(400).json({ message: "User name is missing" });
+    }
+
+    const channel = await User.aggregate([
+        {
+            $match: {
+                userName: userName?.toLowerCase(),
+            },
+        },
+        {
+            $lookup: {
+                from: "subscriptions",
+                localField: "_id",
+                foreignField: "channel",
+                as: "subscribers",
+            },
+        },
+        {
+            $lookup: {
+                from: "subscriptions",
+                localField: "_id",
+                foreignField: "subscriber",
+                as: "subscribedTo",
+            },
+        },
+        {
+            $addFields: {
+                subscribersCount: {
+                    $size: "$subscribers",
+                },
+                channelSubscribedToCount: {
+                    $size: "$subscribedTo",
+                },
+                isSubscribed: {
+                    $cond: {
+                        if: { $in: [req.user?._id, "$subscribers.subscriber"] },
+                        then: true,
+                        else: false,
+                    },
+                },
+            },
+        },
+        {
+            $project: {
+                fullName: 1,
+                userName: 1,
+                subscribersCount: 1,
+                channelSubscribedToCount: 1,
+                isSubscribed: 1,
+                avatar: 1,
+                coverImage: 1,
+                email: 1,
+            },
+        },
+    ]);
+
+    if (!channel?.length) {
+        return res.status(404).json({ message: "Channel does not exist" });
+    }
+
+    return res.status(200).json({
+        message: "Channel detail fetched successfully",
+        data: channel[0], //Because aggregate always return array
+    });
+};
+
 export {
     registerUser,
     loginUser,
@@ -307,4 +377,5 @@ export {
     updateAccountDetails,
     updateUserAvatar,
     updateUserCoverImage,
+    getUserChannelProfile,
 };
