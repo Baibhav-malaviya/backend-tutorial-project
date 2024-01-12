@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import { User } from "../models/user.model.js";
 import { uploadOnCloudinary } from "../utils/cloudinary.js";
 import Jwt from "jsonwebtoken";
@@ -141,7 +142,8 @@ const logoutUser = async (req, res) => {
     };
 
     //delete cookies from frontend
-    res.status(200)
+    return res
+        .status(200)
         .clearCookie("accessToken", options)
         .clearCookie("refreshToken", options)
         .json({ message: "User logged out successfully" });
@@ -274,7 +276,7 @@ const updateUserCoverImage = async (req, res) => {
         return res.status(400).json({ message: "Cover image not found" });
     }
 
-    const coverImage = await uploadOnCloudinary(coverImage);
+    const coverImage = await uploadOnCloudinary(coverImageLocalPath);
 
     if (!coverImage.url) {
         return res
@@ -282,7 +284,7 @@ const updateUserCoverImage = async (req, res) => {
             .json({ message: "Error in uploading cover image" });
     }
 
-    const user = await User.findByIdAndRemove(
+    const user = await User.findByIdAndUpdate(
         req.user?._id,
         {
             $set: {
@@ -367,6 +369,55 @@ const getUserChannelProfile = async (req, res) => {
     });
 };
 
+const getWatchHistory = async (req, res) => {
+    const user = await User.aggregate([
+        {
+            $match: {
+                _id: new mongoose.Types.ObjectId(req.user._id),
+            },
+        },
+        {
+            $lookup: {
+                from: "videos",
+                localField: "watchHistory",
+                foreignField: "_id",
+                as: "watchHistory",
+                pipeline: [
+                    {
+                        $lookup: {
+                            from: "users",
+                            localField: "owner",
+                            foreignField: "_id",
+                            as: "owner",
+                            pipeline: [
+                                {
+                                    $project: {
+                                        userName: 1,
+                                        fullName: 1,
+                                        avatar: 1,
+                                    },
+                                },
+                            ],
+                        },
+                    },
+                    {
+                        $addFields: {
+                            owner: {
+                                $first: "$owner",
+                            },
+                        },
+                    },
+                ],
+            },
+        },
+    ]);
+
+    return res.status(200).json({
+        message: "watchHistory  fetched successfully",
+        data: user[0].watchHistory,
+    });
+};
+
 export {
     registerUser,
     loginUser,
@@ -378,4 +429,5 @@ export {
     updateUserAvatar,
     updateUserCoverImage,
     getUserChannelProfile,
+    getWatchHistory,
 };
