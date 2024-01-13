@@ -1,15 +1,15 @@
-import express, { Schema, model } from "express";
+import express from "express";
+import mongoose, { Schema, model } from "mongoose";
 
 const tweetSchema = new Schema(
     {
         content: {
             type: String,
             required: true,
-            i,
         },
         owner: {
             type: Schema.Types.ObjectId,
-            required: true,
+            ref: "User",
         },
     },
     { timestamps: true },

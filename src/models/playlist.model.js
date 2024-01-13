@@ -1,4 +1,5 @@
-import express, { Schema, model } from "express";
+import express from "express";
+import mongoose, { Schema, model } from "mongoose";
 
 const playListSchema = new Schema(
     {

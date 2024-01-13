@@ -1,5 +1,5 @@
-import express, { Schema, model } from "express";
-import { Aggregate } from "mongoose";
+import express from "express";
+import mongoose, { Aggregate, Schema, model } from "mongoose";
 import mongooseAggregatePaginate from "mongoose-aggregate-paginate-v2";
 
 const commentSchema = new Schema(
