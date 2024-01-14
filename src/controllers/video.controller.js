@@ -1,6 +1,9 @@
 import mongoose, { mongo } from "mongoose";
 import { Video } from "../models/video.model.js";
-import { uploadOnCloudinary } from "../utils/cloudinary.js";
+import {
+    uploadOnCloudinary,
+    deleteFromCloudinary,
+} from "../utils/cloudinary.js";
 
 const getAllVideos = async (req, res) => {
     const { page = 1, limit = 10, query, sortBy, sortType, userId } = req.query;
@@ -101,6 +104,9 @@ const updateVideo = async (req, res) => {
             message: "There is nothing to update, required some field",
         });
 
+    const video = await Video.findById(videoId);
+    await deleteFromCloudinary(video.thumbnail);
+
     const thumbnail = await uploadOnCloudinary(thumbnailLocalPath);
 
     const updatedVideo = await Video.findByIdAndUpdate(
@@ -126,7 +132,17 @@ const deleteVideo = async (req, res) => {
     if (!videoId)
         return res.status(403).json({ message: "videoId must be provided" });
 
+    const video = await Video.findById(videoId);
+
+    if (!video)
+        return res
+            .status(404)
+            .json({ message: "incorrect videoId as video not found" });
+
     await Video.findByIdAndDelete(videoId);
+
+    await deleteFromCloudinary(video.videoFile);
+    await deleteFromCloudinary(video.thumbnail);
 
     return res.status(200).json({ message: "video deleted successfully" });
 };

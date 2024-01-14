@@ -1,6 +1,9 @@
 import mongoose from "mongoose";
 import { User } from "../models/user.model.js";
-import { uploadOnCloudinary } from "../utils/cloudinary.js";
+import {
+    deleteFromCloudinary,
+    uploadOnCloudinary,
+} from "../utils/cloudinary.js";
 import Jwt from "jsonwebtoken";
 
 const generateAccessAndRefreshToken = async (userId) => {
@@ -248,7 +251,9 @@ const updateUserAvatar = async (req, res) => {
         return res.status(400).json({ message: "Avatar file not found" });
     }
 
+    const userToDelete = await User.findById(req.user._id);
     const avatar = await uploadOnCloudinary(avatarLocalPath);
+    await deleteFromCloudinary(userToDelete.avatar);
 
     if (!avatar.url) {
         return res
@@ -276,7 +281,9 @@ const updateUserCoverImage = async (req, res) => {
         return res.status(400).json({ message: "Cover image not found" });
     }
 
+    const userToDelete = await User.findById(req.user._id);
     const coverImage = await uploadOnCloudinary(coverImageLocalPath);
+    await deleteFromCloudinary(userToDelete.coverImage);
 
     if (!coverImage.url) {
         return res
