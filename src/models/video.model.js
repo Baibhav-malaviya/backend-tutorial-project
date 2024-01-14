@@ -1,5 +1,5 @@
-import express, { Schema, model } from "express";
-import { Aggregate } from "mongoose";
+import mongoose, { Schema, model } from "mongoose";
+
 import mongooseAggregatePaginate from "mongoose-aggregate-paginate-v2";
 
 const videoSchema = new Schema(
@@ -30,10 +30,10 @@ const videoSchema = new Schema(
         },
         isPublished: {
             type: Boolean,
-            debugger: true,
+            default: true,
         },
         owner: {
-            type: Schema.Types.objectId,
+            type: Schema.Types.ObjectId,
             ref: "User",
         },
     },
